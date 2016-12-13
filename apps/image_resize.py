@@ -1,14 +1,13 @@
 from __future__ import print_function
 from PIL import Image
 
-import io
 import uuid
 
 class ImageResize:
     def resize(self, stream, crop):
         print('Cropping direction:', crop)
 
-        image = Image.open(io.BytesIO(stream))
+        image = Image.open(stream)
         print('Image Stats:', image.format, image.size, image.mode)
 
         # Calculate image region to crop
