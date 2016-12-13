@@ -1,8 +1,12 @@
 import requests
 import time
 import os
+import io
+import sys
 
 from flask_restful import Resource, Api, reqparse
+from flask import request
+from werkzeug import secure_filename
 from apps import app
 from apps.image_resize import ImageResize
 from apps.classification import Tensorflow
@@ -17,20 +21,20 @@ class Classify(Resource):
             type = str,
             required = True,
             help = '',
-            location = 'json')
+            location = 'form')
 
         self.reqparse.add_argument('imageUrl',
             type = str,
-            required = True,
+            required = False,
             help = 'Image Url to download',
-            location = 'json')
+            location = 'form')
 
         self.reqparse.add_argument('imageCrop',
             type = str,
             required = False,
             default = "none",
             help = 'right | left | none',
-            location = 'json')
+            location = 'form')
 
         super(Classify, self).__init__()
 
@@ -40,12 +44,17 @@ class Classify(Resource):
         args = self.reqparse.parse_args()
 
         start = time.time()
-        response = requests.get(args.imageUrl, stream=True)
+        if (args.imageUrl):
+            response = requests.get(args.imageUrl, stream=True)
+            image = io.BytesIO(response.content)
+        else:
+            image = request.files['image']
+            image.seek(0)
         downloadTimeElapsed = (time.time() - start)
 
         start = time.time()
         imgResize = ImageResize()
-        imgOutputPath = imgResize.resize(response.content, args.imageCrop.lower())
+        imgOutputPath = imgResize.resize(image, args.imageCrop.lower())
         resizeTimeElapsed = (time.time() - start)
 
         start = time.time()
@@ -58,13 +67,12 @@ class Classify(Resource):
         postEnd = time.time()
 
         return {
-            'downloadImageSize': len(response.content),
+            'totalTimeElapsedMs': (postEnd - postStart) * 1000,
             'downloadTimeElapsedMs': downloadTimeElapsed * 1000,
             'resizeTimeElapsedMs': resizeTimeElapsed * 1000,
             'resizeImagePath': imgOutputPath,
             'classifyOutput': output,
-            'classifyTimeElapsedMs': classifyTimeElapsed * 1000,
-            'totalTimeElapsedMs': (postEnd - postStart) * 1000
+            'classifyTimeElapsedMs': classifyTimeElapsed * 1000
         }
 
 api.add_resource(Classify, '/classify', endpoint = 'classify')
